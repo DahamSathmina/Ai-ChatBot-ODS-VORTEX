@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+requests
+faiss-cpu
+python-json-logger
+pydantic
+python-multipart
+asyncpg
+SQLAlchemy[aio]
+aioredis
+python-jose

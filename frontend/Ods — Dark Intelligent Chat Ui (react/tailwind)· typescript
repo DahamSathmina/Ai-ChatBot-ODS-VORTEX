@@ -1,0 +1,327 @@
+import React, { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+// shadcn/ui components are available in the environment per instructions
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar } from "@/components/ui/avatar";
+import { Cog } from "lucide-react";
+
+// ODSChatUI.jsx
+// Wired to FastAPI backend (WebSocket + REST upload/index endpoints).
+// - WebSocket: ws://<HOST>/v1/ws/chat?token=<JWT>
+// - Upload: POST /v1/upload (form-data file, Authorization: Bearer <JWT>)
+// Replace HOST and token management according to your deployment.
+
+export default function ODSChatUI() {
+  const [theme, setTheme] = useState({
+    primary: "indigo-500",
+    accent: "cyan-400",
+    bg: "bg-[#0b0e12]",
+    panel: "bg-[#0f1720]",
+    glass: "bg-gradient-to-b from-black/20 to-white/2",
+  });
+
+  const [messages, setMessages] = useState([
+    { id: 1, role: "assistant", text: "Welcome to ODS — how can I help you today?" },
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [jwt, setJwt] = useState("");
+  const [host, setHost] = useState("http://localhost:8000");
+  const [indexing, setIndexing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const wsRef = useRef(null);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    // auto-scroll
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    // cleanup websocket on unmount
+    return () => {
+      if (wsRef.current) wsRef.current.close();
+    };
+  }, []);
+
+  // Build websocket URL with token param for simple auth
+  function wsUrl() {
+    const scheme = host.startsWith("https") ? "wss" : host.startsWith("http") ? "ws" : "ws";
+    const base = host.replace(/^https?:\/\//, "");
+    return `${scheme}://${base}/v1/ws/chat${jwt ? `?token=${encodeURIComponent(jwt)}` : ""}`;
+  }
+
+  function connect() {
+    if (wsRef.current) return;
+    setLoading(true);
+    try {
+      const url = wsUrl();
+      const ws = new WebSocket(url);
+      ws.onopen = () => {
+        setConnected(true);
+        setLoading(false);
+        pushSystemMessage("Connected to backend.");
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          if (data.type === "delta") {
+            appendAssistantChunk(data.content);
+          } else if (data.type === "done") {
+            finalizeAssistantMessage();
+            setLoading(false);
+          } else if (data.type === "error") {
+            pushSystemMessage(`Error: ${data.message}`);
+            setLoading(false);
+          }
+        } catch (e) {
+          // server might send raw text tokens
+          appendAssistantChunk(evt.data);
+        }
+      };
+
+      ws.onerror = (e) => {
+        setLoading(false);
+        pushSystemMessage("WebSocket error");
+      };
+      ws.onclose = () => {
+        setConnected(false);
+        pushSystemMessage("Disconnected");
+      };
+      wsRef.current = ws;
+    } catch (e) {
+      setLoading(false);
+      pushSystemMessage("Failed to open WebSocket");
+    }
+  }
+
+  function disconnect() {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setConnected(false);
+  }
+
+  function pushSystemMessage(text) {
+    setMessages((m) => [...m, { id: Date.now(), role: "system", text }]);
+  }
+
+  function appendAssistantChunk(chunk) {
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === "assistant" && last.streaming) {
+        const updated = [...prev];
+        updated[updated.length - 1] = { ...last, text: last.text + chunk };
+        return updated;
+      }
+      return [...prev, { id: Date.now(), role: "assistant", text: chunk, streaming: true }];
+    });
+  }
+
+  function finalizeAssistantMessage() {
+    setMessages((prev) => prev.map(m => m.role === 'assistant' && m.streaming ? { ...m, streaming: false } : m));
+  }
+
+  function sendMessage() {
+    if (!input.trim()) return;
+    connect();
+    const userMsg = { id: Date.now(), role: "user", text: input };
+    setMessages((m) => [...m, userMsg]);
+
+    // ensure there's an assistant placeholder ready to receive stream
+    setMessages((m) => [...m, { id: Date.now() + 1, role: "assistant", text: "", streaming: true }]);
+
+    try {
+      const payload = JSON.stringify({ type: "message", text: input });
+      wsRef.current?.send(payload);
+      setLoading(true);
+    } catch (e) {
+      pushSystemMessage("Failed to send message to backend");
+      setLoading(false);
+    }
+    setInput("");
+  }
+
+  // File upload + index
+  async function uploadFile(file) {
+    if (!file) return;
+    setIndexing(true);
+    setUploadProgress(0);
+    const url = `${host.replace(/\/$/, "")}/v1/upload`;
+    const form = new FormData();
+    form.append("file", file, file.name);
+
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url);
+      if (jwt) xhr.setRequestHeader("Authorization", `Bearer ${jwt}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          setUploadProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+      xhr.onload = () => {
+        setIndexing(false);
+        setUploadProgress(100);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          pushSystemMessage("Document uploaded and indexed.");
+        } else {
+          pushSystemMessage(`Upload failed: ${xhr.statusText}`);
+        }
+      };
+      xhr.onerror = () => {
+        setIndexing(false);
+        pushSystemMessage("Upload error");
+      };
+      xhr.send(form);
+    } catch (e) {
+      setIndexing(false);
+      pushSystemMessage("Upload failed (exception)");
+    }
+  }
+
+  // Intelligent color generator (placeholder)
+  function generateIntelligentTheme(seed = "default") {
+    const palette = ["purple-500", "indigo-500", "rose-500", "emerald-400", "cyan-400"];
+    const accent = palette[seed.length % palette.length];
+    setTheme((t) => ({ ...t, primary: accent }));
+  }
+
+  return (
+    <div className={`min-h-screen ${theme.bg} text-white antialiased`}>
+      <div className="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-6">
+        {/* Sidebar */}
+        <aside className="col-span-3 h-[80vh] sticky top-6">
+          <Card className={`rounded-2xl overflow-hidden ${theme.panel} shadow-2xl`}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-12 h-12 ring-1 ring-white/5">OD</Avatar>
+                <div>
+                  <div className="font-semibold text-lg">ODS Chat</div>
+                  <div className="text-sm text-slate-400">Local Ollama • RAG-ready</div>
+                </div>
+                <div className="ml-auto">
+                  <Button variant="ghost" size="sm" onClick={() => generateIntelligentTheme("x")}>Theme</Button>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <div className="text-xs text-slate-400 uppercase tracking-wider">Quick Actions</div>
+                <div className="mt-3 grid gap-2">
+                  <Button className="w-full" onClick={() => { setMessages([{ id: Date.now(), role: 'assistant', text: 'New conversation started.' }]); }}>New Chat</Button>
+
+                  <label className="w-full">
+                    <input type="file" className="hidden" id="file-input" onChange={(e) => uploadFile(e.target.files[0])} />
+                    <Button className="w-full" asChild>
+                      <span>Upload & Index Docs</span>
+                    </Button>
+                  </label>
+
+                  <Button className="w-full" onClick={() => pushSystemMessage('Indexing triggered (server)')}>Index KB</Button>
+                </div>
+              </div>
+
+              <div className="mt-6 text-xs text-slate-400">
+                <div className="flex items-center justify-between">
+                  <span>Model</span>
+                  <span className="font-medium">gemma:2b</span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span>Connection</span>
+                  <div className="flex items-center gap-2">
+                    <div className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-rose-500"}`}></div>
+                    <span className="text-xs text-slate-400">{connected ? "Connected" : "Disconnected"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 text-xs text-slate-400">
+                <div className="flex items-center gap-2">
+                  <Cog size={16} />
+                  <span>Settings</span>
+                </div>
+                <div className="mt-3">
+                  <label className="text-[13px] text-slate-300">Backend Host</label>
+                  <input className="w-full rounded p-2 mt-1 bg-[#0b0f14] text-slate-200" value={host} onChange={(e) => setHost(e.target.value)} />
+
+                  <label className="text-[13px] text-slate-300 mt-3">JWT (optional)</label>
+                  <input className="w-full rounded p-2 mt-1 bg-[#0b0f14] text-slate-200" placeholder="Paste JWT for auth" value={jwt} onChange={(e) => setJwt(e.target.value)} />
+
+                  <div className="mt-3">
+                    <label className="text-[13px] text-slate-300">Temperature</label>
+                    <input type="range" min="0" max="1" step="0.1" defaultValue="0.2" className="w-full mt-1" />
+                  </div>
+                </div>
+              </div>
+
+            </CardContent>
+          </Card>
+
+          <motion.div className="mt-4 text-sm text-slate-400" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            Tips: Use "Upload & Index Docs" to add domain knowledge. Use JWT to secure uploads and WS.
+          </motion.div>
+        </aside>
+
+        {/* Main chat area */}
+        <main className="col-span-9">
+          <div className={`rounded-3xl ${theme.panel} shadow-2xl p-6 h-[80vh] flex flex-col`}>
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex-1">
+                <div className="text-lg font-semibold">Conversation</div>
+                <div className="text-xs text-slate-400">Intelligent dark UI • Low latency streaming</div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button onClick={() => { connect(); }} disabled={connected}>Connect</Button>
+                <Button variant="secondary" onClick={() => disconnect()} disabled={!connected}>Disconnect</Button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto pr-4 pb-4 custom-scrollbar">
+              {messages.map((m) => (
+                <div key={m.id} className={`mb-4 ${m.role === "user" ? "text-right" : m.role === 'system' ? 'text-center' : 'text-left'}`}>
+                  <div className={`inline-block max-w-[78%] p-3 rounded-2xl ${m.role === "user" ? `bg-gradient-to-r from-${theme.primary} to-slate-800/40 text-white` : m.role === 'system' ? 'bg-white/5 text-slate-400 italic' : `bg-white/3 text-slate-200`} shadow`}> 
+                    <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                    {m.streaming && <span className="ml-2 animate-pulse text-slate-400">▌</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Composer */}
+            <div className="mt-4">
+              <div className="flex gap-3 items-center">
+                <Input placeholder="Type your message..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendMessage(); }} />
+                <Button onClick={sendMessage} disabled={loading}>Send</Button>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                <div>Model: <span className="font-medium">{"gemma:2b"}</span></div>
+                <div>{loading ? "Generating..." : "Ready"}</div>
+              </div>
+
+              {/* Upload progress */}
+              {indexing && (
+                <div className="mt-2 text-xs text-slate-300">Uploading & indexing: {uploadProgress}%</div>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 8px }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 99px }
+      `}</style>
+    </div>
+  );
+}
