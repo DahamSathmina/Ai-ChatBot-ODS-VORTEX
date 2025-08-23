@@ -10,6 +10,7 @@ class OllamaProvider:
     def __init__(self, model: str = None):
         self.model = model or settings.OLLAMA_MODEL
 
+
     async def stream_generate(self, prompt: str, temperature: float = 0.2) -> AsyncGenerator[str, None]:
         """
         Streams tokens from Ollama via the /api/generate endpoint with stream=True.
