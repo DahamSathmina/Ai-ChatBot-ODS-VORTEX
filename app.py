@@ -3,7 +3,6 @@ from tkinter import scrolledtext
 import threading
 import requests
 import json
-
 # ----------------- CONFIG -----------------
 MODEL_URL = "http://localhost:11434/api/generate"  # Gemma3 API URL
 MODEL_NAME = "gemma3:270m"
