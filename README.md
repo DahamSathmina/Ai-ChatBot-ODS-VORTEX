@@ -92,7 +92,8 @@ Key principles:
 
 ## Quick Start
 
-```Default Ai Agent's
+Default work`Ollama` Ai Modules
+```
   ollama pull gemma3:270m
   ollama pull llama3.2:1b
 ```
