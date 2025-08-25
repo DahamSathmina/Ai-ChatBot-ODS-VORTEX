@@ -393,6 +393,3 @@ Short summary:
 
 Maintain a `CHANGELOG.md` and follow keep-a-changelog conventions.
 
----
-
-**Need further customization (e.g., CI that deploys to a cloud provider, full k8s manifests, or prefilled Docker images)?** Reply with what you'd like added and I'll update the files.
