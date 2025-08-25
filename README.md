@@ -388,8 +388,4 @@ Short summary:
 - FastAPI, Uvicorn, React, Vite, Tailwind CSS for the stack inspiration.
 
 ---
-
-## Changelog
-
-Maintain a `CHANGELOG.md` and follow keep-a-changelog conventions.
-
+# Thank You..!
