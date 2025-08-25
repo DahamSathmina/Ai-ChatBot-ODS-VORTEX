@@ -92,6 +92,11 @@ Key principles:
 
 ## Quick Start
 
+```Default Ai Agent's
+  ollama pull gemma3:270m
+  ollama pull llama3.2:1b
+```
+
 ### Prerequisites
 
 - Python 3.10+
