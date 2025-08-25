@@ -3,7 +3,7 @@
 ![project-badge](https://img.shields.io/badge/project-AI--ChatBot--ODS--VORTEX-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-red) ![python](https://img.shields.io/badge/python-3.10%2B-blue) ![node](https://img.shields.io/badge/node-18%2B-green)
 
 **Production-ready** AI Chatbot platform with a Python backend and a React + TypeScript (Vite) frontend. Designed for maintainability, observability, security, and horizontal scalability.
-
+⚠ Alert : Additional things that you can include in this application have also been added.
 ---
 
 ## Table of Contents
@@ -388,4 +388,4 @@ Short summary:
 - FastAPI, Uvicorn, React, Vite, Tailwind CSS for the stack inspiration.
 
 ---
-# Thank You..!
+# Thank You..!🤍
