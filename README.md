@@ -392,7 +392,7 @@ Short summary:
 ## Acknowledgements
 
 - OpenAI, Ollama, and other LLM research and tooling.
-- FastAPI, Uvicorn, React, Vite, Tailwind CSS for the stack inspiration.
+- FastAPI, Python, Uvicorn, React, Vite, Tailwind CSS for the stack inspiration.
 
 ---
 # Thank You..!🤍
