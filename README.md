@@ -1,6 +1,6 @@
 # VORTEX Ai ChatBot. Experience power of Ai.
 
-![project-badge](https://img.shields.io/badge/project-AI--ChatBot--ODS--VORTEX-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-red) ![python](https://img.shields.io/badge/python-3.10%2B-blue) ![node](https://img.shields.io/badge/node-18%2B-green)
+[![project-badge](https://img.shields.io/badge/project-AI--ChatBot--ODS--VORTEX-blue)](https://github.com/DahamSathmina/Ai-ChatBot-ODS-VORTEX.git) [![license](https://img.shields.io/badge/license-GPL--3.0-red)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text) [![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/) [![node](https://img.shields.io/badge/node-18%2B-green)](https://nodejs.org/en/download)
 
 **Production-ready** AI Chatbot platform with a Python backend and a React + TypeScript (Vite) frontend. Designed for maintainability, observability, security, and horizontal scalability.
 
